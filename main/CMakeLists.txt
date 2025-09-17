@@ -1,11 +1,12 @@
 
 set(SOURCES "app.cc"
-    "drivers/sd_card.cc"
+        "drivers/storage/sd_card.cc" 
 
 )
 
 set(INCLUDE_DIRS "." 
             "drivers"
+            "drivers/storage"
 )
 
 

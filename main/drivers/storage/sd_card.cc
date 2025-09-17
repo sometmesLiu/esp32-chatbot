@@ -1,5 +1,3 @@
-
-
 #include "sd_card.h" 
 #include "esp_log.h"
 #include "esp_err.h"
@@ -50,6 +48,23 @@ SdCard::~SdCard()
 {
 }
 
+esp_err_t SdCard::open(const char* filename, const char* mode) {
+
+    char  file_path[50]; 
+    sprintf(file_path, "%s/%s", MOUNT_POINT, filename);
+
+    m_file = fopen(file_path, mode);
+    return m_file ? ESP_OK : ESP_FAIL;
+}
+
+esp_err_t SdCard::close() {
+    if (m_file) {
+        fclose(m_file);
+        m_file = nullptr;
+    }
+    return ESP_OK;
+}
+
 
 /** 读取指定行数据
  * file_path : 文件路径
@@ -57,14 +72,13 @@ SdCard::~SdCard()
  * output : 输出缓冲区
  * output_size : 输出缓冲区大小
  */
-esp_err_t SdCard::sdCardReadLine(const char *filename, int line_num, char *output, size_t output_size)
+esp_err_t SdCard::read_line( int line_num, char *output, size_t output_size)
 {
     char line[1000]; // 假设每行最大长度为 1000 字符
     int current_line = 0;
 
     char  file_path[50];
-    char data1[100];
-    sprintf(file_path, "%s/%s", MOUNT_POINT, filename);
+    char data1[100]; 
 
     if (output_size>(sizeof(line)-1))
     {
@@ -74,16 +88,10 @@ esp_err_t SdCard::sdCardReadLine(const char *filename, int line_num, char *outpu
     if (output_size < 1) {
         ESP_LOGE(TAG, "Output buffer size is too small");
         return ESP_FAIL;
-    }
-
-    FILE *f = fopen(file_path, "r");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for reading");
-        return ESP_FAIL;
-    }
+    } 
 
     // 逐行读取文件
-    while (fgets(line, sizeof(line), f) != NULL) {
+    while (fgets(line, sizeof(line), m_file) != NULL) {
         current_line++; 
         // 如果当前行是目标行
         if (current_line == line_num) {
@@ -94,13 +102,11 @@ esp_err_t SdCard::sdCardReadLine(const char *filename, int line_num, char *outpu
             } 
             // 将目标行内容复制到输出缓冲区
             strncpy(output, line, output_size - 1);
-            output[output_size - 1] = '\0'; // 确保字符串以 null 结尾
-            fclose(f); 
+            output[output_size - 1] = '\0'; // 确保字符串以 null 结尾 
             return ESP_OK;
         }
     }
-
-    fclose(f);
+ 
 
     // 如果文件行数不足
     if (current_line < line_num) {
@@ -118,51 +124,50 @@ esp_err_t SdCard::sdCardReadLine(const char *filename, int line_num, char *outpu
  * @param output : 输出缓冲区
  * @param output_size : 输出缓冲区大小
  */
-esp_err_t SdCard::sdCardReadFile(const char *filename, char *output, size_t output_size) {
-
-
-    char  file_path[50];
-    char data1[100];
-    sprintf(file_path, "%s/%s", MOUNT_POINT, filename);
-
-
-    FILE *f = fopen(file_path, "r");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for reading");
-        return ESP_FAIL;
-    }
-
+esp_err_t SdCard::read_file(char *output, size_t output_size) {
+ 
+    if (m_file == nullptr) {
+        ESP_LOGE(TAG, "File not opened");
+        return ESP_ERR_INVALID_STATE;
+    } 
+    // 获取当前文件指针位置
+    long current_pos = ftell(m_file);
+    ESP_LOGD(TAG, "Current file position before read: %ld", current_pos); 
     // 获取文件大小
-    fseek(f, 0, SEEK_END); // 移动到文件末尾
-    long file_size = ftell(f); // 获取文件大小
-    fseek(f, 0, SEEK_SET); // 回到文件开头
-
+    if (fseek(m_file, 0, SEEK_END) != 0) {
+        ESP_LOGE(TAG, "Failed to seek to end");
+        return ESP_FAIL;
+    } 
+    long file_size = ftell(m_file);
     if (file_size < 0) {
         ESP_LOGE(TAG, "Failed to get file size");
-        fclose(f);
         return ESP_FAIL;
-    }
-
-    // 检查缓冲区是否足够大
-    if (output_size < (size_t)(file_size + 1)) { // +1 用于字符串结束符
-        ESP_LOGE(TAG, "Output buffer is too small (required: %ld, provided: %d)", file_size + 1, output_size);
-        fclose(f);
+    } 
+    // 重置文件指针
+    if (fseek(m_file, 0, SEEK_SET) != 0) {
+        ESP_LOGE(TAG, "Failed to seek to start");
         return ESP_FAIL;
-    }
-
+    } 
+    // 检查缓冲区大小
+    if (output_size < (size_t)(file_size + 1)) {
+        ESP_LOGE(TAG, "Buffer too small (need %ld, have %d)", 
+                file_size + 1, output_size);
+        return ESP_ERR_INVALID_SIZE;
+    } 
     // 读取文件内容
-    size_t bytes_read = fread(output, 1, file_size, f);
-    if (bytes_read != file_size) {
-        ESP_LOGE(TAG, "Failed to read file content");
-        fclose(f);
-        return ESP_FAIL;
+    size_t bytes_read = fread(output, 1, file_size, m_file);
+    output[bytes_read] = '\0';  // 确保字符串终止
+  
+
+    ESP_LOGI(TAG, "Read %zu/%ld bytes: %.*s", 
+             bytes_read, file_size, 
+             (int)(bytes_read > 50 ? 50 : bytes_read), output);
+
+    if (bytes_read != (size_t)file_size) {
+        ESP_LOGW(TAG, "Partial read (expected %ld, got %zu)", 
+                file_size, bytes_read);
     }
 
-    // 添加字符串结束符
-    output[file_size] = '\0';
-
-    fclose(f);
-    ESP_LOGI(TAG, "Read entire file: %ld bytes", file_size);
     return ESP_OK;
 }
 
@@ -174,28 +179,28 @@ esp_err_t SdCard::sdCardReadFile(const char *filename, char *output, size_t outp
  * @param data : 要写入的数据
  * @param isAppend : 是否为追内容，true:追加内容  false:覆盖内容
  */
-esp_err_t SdCard::sdWriteFile(char *filename, char *data,bool isAppend)
-{
-    esp_err_t ret; 
-    char  file_path[50];
-    char data1[100];
-    sprintf(file_path, "%s/%s", MOUNT_POINT, filename); 
-   
-    FILE *f =NULL;
-    if(isAppend)
-    {
-        f = fopen(file_path, "a");
-    }else{
-        f = fopen(file_path, "w");
-    }
+esp_err_t SdCard::write_file(const char*  data,size_t size)
+{ 
     
-    if (f == NULL)
-    {
-        ESP_LOGE(TAG, "Failed to open file for writing");
-        return ESP_FAIL;
+    return fwrite(data, 1, size, m_file) == size ? ESP_OK : ESP_FAIL;  
+}
+
+esp_err_t SdCard::seek(size_t offset,SeekMode mode) {
+    if (!m_file) {
+        return ESP_ERR_INVALID_STATE; // 文件未打开
     }
-    fprintf(f , data);
-    fclose(f);
-    ESP_LOGI(TAG, "File written");
+
+    int origin;
+    switch (mode) {
+        case SeekMode::SET: origin = SEEK_SET; break;
+        case SeekMode::CUR: origin = SEEK_CUR; break;
+        case SeekMode::END: origin = SEEK_END; break;
+        default: return ESP_ERR_INVALID_ARG;
+    }
+
+    if (fseek(m_file, offset, origin) != 0) {
+        return ESP_FAIL; // 移动失败
+    }
+
     return ESP_OK;
 }
