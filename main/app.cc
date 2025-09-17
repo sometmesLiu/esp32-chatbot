@@ -1,42 +1,44 @@
-#include  <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include "esp_system.h"
+#include <cstdio>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_system.h" 
+#include "sd_card.h" 
 
+char buffer[3000];
 
-void my_task(void *pvParameters) {
-    while (1) {
-        ESP_LOGI("MY_TASK", "任务正在运行");
-        vTaskDelay(1000 / portTICK_PERIOD_MS); // 延时1秒
+extern "C" void batch_wirte_text(SdCard *sdcard) {
+    char line_buffer[100];
+    for (size_t i = 0; i < 100; i++)
+    {
+        std::printf("写入第%d行数据\n",i);
+        snprintf(line_buffer,sizeof(line_buffer),"%d行数据[小猪快跑]\n", i);
+        sdcard->sdWriteFile("test.txt",line_buffer, true);
     }
+
 }
+extern "C" void app_main(void)
+{
+    esp_log_level_set("TAG", ESP_LOG_DEBUG); 
+    std::printf("Hello World!\n");
+    //创建SD卡对象
+    SdCard sdcard = SdCard();
+    // 写入文件
+    sdcard.sdWriteFile("test.txt", "开始批量写入",false);
+    ESP_LOGI(TAG,"开始批量写入文件");
+    batch_wirte_text(&sdcard);
+    ESP_LOGI(TAG,"写入完毕，开始读取文件");
 
+    // 读取文件
+    sdcard.sdCardReadFile("test.txt",buffer,sizeof(buffer));
 
-extern "C" void app_main() {
-    xTaskCreate(
-        my_task,           // 任务函数
-        "MyTask",          // 任务名称
-        configMINIMAL_STACK_SIZE,              // 堆栈大小（字节）
-        NULL,              // 传递给任务的参数
-        5,                 // 优先级
-        NULL               // 任务句柄
-    );
+    ESP_LOGI(TAG,"SD的内容为：%s\n",buffer);
 
-    xTaskCreatePinnedToCore(
-        my_task,           // 任务函数
-        "MyTaskPinned",    // 任务名称
-        configMINIMAL_STACK_SIZE,              // 堆栈大小（字节）
-        NULL,              // 传递给任务的参数
-        5,                 // 优先级
-        NULL,             // 任务句柄
-        0                  // 核心ID（0或1）
-    );
+    char tmp[50];
+    // 读取指定行的文件内容
+    sdcard.sdCardReadLine("test.txt",20,tmp,sizeof(tmp));
+    ESP_LOGI(TAG,"SD,第20行的内容为：%s\n",tmp);
+
+     
 }
-
-
-
-
-
-
-
-
