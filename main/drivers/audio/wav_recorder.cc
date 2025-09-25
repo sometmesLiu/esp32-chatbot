@@ -32,15 +32,19 @@ esp_err_t WavRecorder::record(i2s_chan_handle_t i2s_chan, uint16_t seconds) {
     // 2. 实时录音并分段写入数据
     /* Start recording */
     size_t wav_written = 0;
-    static int16_t i2s_readraw_buff[8192];
+    static int16_t i2s_readraw_buff[8192];  // 16384字节
+    // 每次读取约 16384 ÷ 64000 ≈ 0.256秒 的音频数据
      
 
     //使能通道，如果出错直接跳到err标签位置
+    // 开启了I2S接收通道，麦克风开始工作
     ESP_GOTO_ON_ERROR(i2s_channel_enable(i2s_chan), err, TAG, "error while starting i2s rx channel");
 
     while (wav_written < wav_size) {
+        // 进度显示控制
         if(wav_written % byte_rate < sizeof(i2s_readraw_buff)) {
-            ESP_LOGI(TAG, "Recording: %"PRIu32"/%ds", wav_written/byte_rate + 1, EXAMPLE_RECORD_TIME_SEC);
+            //  每录制约1秒就显示一次进度
+            ESP_LOGI(TAG, "Recording: %"PRIu32"/%ds", wav_written/byte_rate + 1, seconds);
             printf(".");
         }
         size_t bytes_read = 0;

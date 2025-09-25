@@ -66,54 +66,93 @@ esp_err_t SdCard::close() {
 }
 
 
-/** 读取指定行数据
- * file_path : 文件路径
- * line_num : 行号
- * output : 输出缓冲区
- * output_size : 输出缓冲区大小
- */
-esp_err_t SdCard::read_line( int line_num, char *output, size_t output_size)
+esp_err_t SdCard::read_line(int line_num, char *output, size_t output_size)
 {
-    char line[1000]; // 假设每行最大长度为 1000 字符
-    int current_line = 0;
-
-    char  file_path[50];
-    char data1[100]; 
-
-    if (output_size>(sizeof(line)-1))
-    {
-        return ESP_FAIL;
-    }
-    // 检查输出缓冲区是否足够大
-    if (output_size < 1) {
+    if (output_size < 2) {
         ESP_LOGE(TAG, "Output buffer size is too small");
         return ESP_FAIL;
-    } 
-
-    // 逐行读取文件
-    while (fgets(line, sizeof(line), m_file) != NULL) {
-        current_line++; 
-        // 如果当前行是目标行
-        if (current_line == line_num) {
-            // 去掉行末的换行符（如果有）
-            size_t len = strlen(line);
-            if (len > 0 && line[len - 1] == '\n') {
-                line[len - 1] = '\0'; // 去掉换行符
-            } 
-            // 将目标行内容复制到输出缓冲区
-            strncpy(output, line, output_size - 1);
-            output[output_size - 1] = '\0'; // 确保字符串以 null 结尾 
-            return ESP_OK;
-        }
     }
- 
 
-    // 如果文件行数不足
-    if (current_line < line_num) {
-        ESP_LOGE(TAG, "File has only %d lines, requested line %d", current_line, line_num);
+    // 检查文件是否打开
+    if (!m_file) {
+        ESP_LOGE(TAG, "File not opened");
         return ESP_FAIL;
     }
 
+    // 保存当前文件位置
+    long original_pos = ftell(m_file);
+    ESP_LOGD(TAG, "Current file position before read: %ld", original_pos);
+    
+    // 重置到文件开始
+    if (fseek(m_file, 0, SEEK_SET) != 0) {
+        ESP_LOGE(TAG, "Failed to seek to beginning of file");
+        return ESP_FAIL;
+    }
+
+    int current_line = 0;
+    size_t buffer_size = 1024;  // 初始缓冲区大小
+    char* line_buffer = (char*)malloc(buffer_size);
+    
+    if (!line_buffer) {
+        ESP_LOGE(TAG, "Failed to allocate memory for line buffer");
+        return ESP_ERR_NO_MEM;
+    }
+
+    // 逐行读取文件
+    while (true) {
+        size_t i = 0;
+        int ch;
+        
+        // 逐字符读取直到换行符或文件结束
+        while ((ch = fgetc(m_file)) != EOF) {
+            // 如果缓冲区不够，扩展它
+            if (i >= buffer_size - 1) {
+                buffer_size *= 2;
+                char* temp = (char*)realloc(line_buffer, buffer_size);
+                if (!temp) {
+                    free(line_buffer);
+                    fseek(m_file, original_pos, SEEK_SET);  // 恢复文件位置
+                    return ESP_ERR_NO_MEM;
+                }
+                line_buffer = temp;
+            }
+            
+            if (ch == '\n') {
+                break;  // 遇到换行符结束
+            }
+            
+            line_buffer[i++] = (char)ch;
+        }
+        
+        // 处理文件最后一行没有换行符的情况
+        if (i > 0 || ch != EOF) {
+            current_line++;
+            
+            // 如果当前行是目标行
+            if (current_line == line_num) {
+                line_buffer[i] = '\0';  // 字符串结束符
+                
+                // 复制到输出缓冲区
+                strncpy(output, line_buffer, output_size - 1);
+                output[output_size - 1] = '\0';
+                
+                free(line_buffer);
+                fseek(m_file, original_pos, SEEK_SET);  // 恢复文件位置
+                return ESP_OK;
+            }
+        }
+        
+        // 文件结束
+        if (ch == EOF) {
+            break;
+        }
+    }
+
+    free(line_buffer);
+    fseek(m_file, original_pos, SEEK_SET);  // 恢复文件位置
+    
+    // 如果文件行数不足
+    ESP_LOGE(TAG, "File has only %d lines, requested line %d", current_line, line_num);
     return ESP_FAIL;
 }
 

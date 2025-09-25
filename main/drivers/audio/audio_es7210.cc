@@ -73,17 +73,17 @@ void AudioEs7210::es7210_code_init(void)
 
     // 初始化es7210芯片
     ESP_LOGI(TAG, "Configure ES7210 codec parameters");
-    es7210_codec_config_t codec_conf = {
-        .sample_rate_hz = EXAMPLE_I2S_SAMPLE_RATE,
-        .mclk_ratio = EXAMPLE_I2S_MCLK_MULTIPLE,
-        .i2s_format = EXAMPLE_I2S_TDM_FORMAT,
-        .bit_width = (es7210_i2s_bits_t)EXAMPLE_I2S_SAMPLE_BITS,
-        .mic_bias = EXAMPLE_ES7210_MIC_BIAS,
-        .mic_gain = EXAMPLE_ES7210_MIC_GAIN,
+   es7210_codec_config_t codec_conf = {
+        .sample_rate_hz = EXAMPLE_I2S_SAMPLE_RATE,    // 采样率: 16000Hz
+        .mclk_ratio = EXAMPLE_I2S_MCLK_MULTIPLE,      // MCLK倍数: 256
+        .i2s_format = EXAMPLE_I2S_TDM_FORMAT,         // I2S格式: I2S
+        .bit_width = (es7210_i2s_bits_t)EXAMPLE_I2S_SAMPLE_BITS,  // 位宽: 16bit
+        .mic_bias = EXAMPLE_ES7210_MIC_BIAS,          // 麦克风电压偏置: 2.87V
+        .mic_gain = EXAMPLE_ES7210_MIC_GAIN,          // 麦克风增益: 30dB
         .flags{
-            .tdm_enable = true
+            .tdm_enable = true                        // 启用TDM模式
         }
-    };
+};
     ESP_ERROR_CHECK(es7210_config_codec(es7210_handle, &codec_conf));
     ESP_ERROR_CHECK(es7210_config_volume(es7210_handle, EXAMPLE_ES7210_ADC_VOLUME));
 }
