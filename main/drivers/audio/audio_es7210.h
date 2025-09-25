@@ -3,6 +3,7 @@
 #include <driver/i2s_common.h>
 #include <driver/i2s.h>
 #include <driver/i2s_tdm.h>
+#include "audio_input_interface.h"
 
 
 
@@ -35,12 +36,18 @@
 
 #define EXAMPLE_RECORD_TIME_SEC (10)
 
-class AudioEs7210
+class AudioEs7210: public AudioInputInterface
 {
 private:
     i2s_chan_handle_t es7210_i2s_init(void);
     void es7210_code_init(void);
     /* data */
+    i2s_chan_handle_t i2s_chan;
+    uint32_t sample_rate;
+    uint16_t channel_num;
 public: 
-    i2s_chan_handle_t audio_es7210_init(void); 
+    esp_err_t disable() override;
+    esp_err_t enable() override;
+    esp_err_t read(void *dest, size_t size, size_t *bytes_read) override;
+    AudioEs7210(uint32_t sample_rate = 16000, uint8_t channel_num = 2);
 }; 

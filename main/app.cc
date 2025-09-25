@@ -16,14 +16,12 @@ extern "C" void app_main(void)
 {
     auto sdFile = std::make_shared<SdCard>();
     ESP_ERROR_CHECK(sdFile->open("vvv.wav","w+"));
-    // // 通过构造函数注入依赖
-    WavRecorder recorder(sdFile);
-    //
-    AudioEs7210 audioEs7210 = AudioEs7210();
-    
-    // // 开始录音
-    i2s_chan_handle_t i2sChan = audioEs7210.audio_es7210_init();
-    recorder.record(i2sChan, 10);
 
+    auto audioEs7210 = std::make_shared<AudioEs7210>();
+
+    // // 通过构造函数注入依赖
+    WavRecorder recorder(sdFile, audioEs7210);
+    recorder.record(10);
+    
     sdFile->close();
 }

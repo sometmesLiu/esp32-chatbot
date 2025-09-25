@@ -12,6 +12,23 @@
 
 
 #define TAG "ES7210"
+
+AudioEs7210::AudioEs7210(uint32_t sample_rate, uint8_t channel_num)
+{
+    i2s_chan = es7210_i2s_init();
+}
+esp_err_t AudioEs7210::enable()
+{
+    return i2s_channel_enable(i2s_chan);
+}
+esp_err_t AudioEs7210::disable()
+{
+    return i2s_channel_disable(i2s_chan);
+}
+esp_err_t AudioEs7210::read(void *dest, size_t size, size_t *bytes_read)
+{
+    return i2s_channel_read(i2s_chan, dest, size, bytes_read, pdMS_TO_TICKS(1000));
+}
 i2s_chan_handle_t AudioEs7210::es7210_i2s_init(void)
 {
     i2s_chan_handle_t i2s_rx_chan = NULL;  // 定义接收通道句柄 
@@ -88,13 +105,3 @@ void AudioEs7210::es7210_code_init(void)
     ESP_ERROR_CHECK(es7210_config_volume(es7210_handle, EXAMPLE_ES7210_ADC_VOLUME));
 }
 
-
-i2s_chan_handle_t AudioEs7210::audio_es7210_init(void)
-{
-    ESP_LOGI(TAG, "Initialize ES7210 codec");
-    i2s_chan_handle_t i2s_rx_chan = es7210_i2s_init();
-    es7210_code_init();
-    return i2s_rx_chan;
-}
-
- 

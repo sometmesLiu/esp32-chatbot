@@ -6,12 +6,12 @@
 
 #define TAG "WavRecorder"
 
-WavRecorder::WavRecorder(std::shared_ptr<FileInterface> fileInterface) 
-: m_file(fileInterface) {
+WavRecorder::WavRecorder(std::shared_ptr<FileInterface> fileInterface, std::shared_ptr<AudioInputInterface> audioInput) 
+: m_file(fileInterface), m_audio_input(audioInput) {
 
 } 
 
-esp_err_t WavRecorder::record(i2s_chan_handle_t i2s_chan, uint16_t seconds) {
+esp_err_t WavRecorder::record(uint16_t seconds) {
 
     esp_err_t ret = ESP_OK; 
     // 计算音频数据大小
@@ -38,7 +38,7 @@ esp_err_t WavRecorder::record(i2s_chan_handle_t i2s_chan, uint16_t seconds) {
 
     //使能通道，如果出错直接跳到err标签位置
     // 开启了I2S接收通道，麦克风开始工作
-    ESP_GOTO_ON_ERROR(i2s_channel_enable(i2s_chan), err, TAG, "error while starting i2s rx channel");
+    ESP_GOTO_ON_ERROR(m_audio_input->enable(), err, TAG, "error while starting i2s rx channel");
 
     while (wav_written < wav_size) {
         // 进度显示控制
@@ -49,8 +49,11 @@ esp_err_t WavRecorder::record(i2s_chan_handle_t i2s_chan, uint16_t seconds) {
         }
         size_t bytes_read = 0;
         /* Read RAW samples from ES7210 */
-        ESP_GOTO_ON_ERROR(i2s_channel_read(i2s_chan, i2s_readraw_buff, sizeof(i2s_readraw_buff), &bytes_read,
-                          pdMS_TO_TICKS(1000)), err, TAG, "error while reading samples from i2s");
+        ESP_GOTO_ON_ERROR(
+            m_audio_input->read(i2s_readraw_buff, sizeof(i2s_readraw_buff), &bytes_read),
+             err, 
+             TAG, 
+             "error while reading samples from i2s");
         /* Write the samples to the WAV file */
         // ESP_GOTO_ON_FALSE(m_file->write_file(filename,(char *)i2s_readraw_buff,true), ESP_FAIL, err,
         // TAG, "error while writing samples to wav file");
@@ -66,7 +69,7 @@ esp_err_t WavRecorder::record(i2s_chan_handle_t i2s_chan, uint16_t seconds) {
 
     printf("录制完成\n");
 err:
-    i2s_channel_disable(i2s_chan);
+    m_audio_input->disable();
     return ret;
 
 }
