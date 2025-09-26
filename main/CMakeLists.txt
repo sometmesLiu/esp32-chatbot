@@ -1,5 +1,7 @@
 
-set(SOURCES "app.cc"
+set(SOURCES "main.cc"
+        "app.cc"
+        "work_task.cc"
         "drivers/storage/sd_card.cc" 
         "drivers/audio/audio_es7210.cc" 
         "drivers/audio/wav_recorder.cc" 
