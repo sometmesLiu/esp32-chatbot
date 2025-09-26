@@ -16,6 +16,7 @@
 AudioEs7210::AudioEs7210(uint32_t sample_rate, uint8_t channel_num)
 {
     i2s_chan = es7210_i2s_init();
+    es7210_code_init();
 }
 esp_err_t AudioEs7210::enable()
 {

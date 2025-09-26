@@ -58,7 +58,22 @@ esp_err_t WavRecorder::record(uint16_t seconds) {
         // ESP_GOTO_ON_FALSE(m_file->write_file(filename,(char *)i2s_readraw_buff,true), ESP_FAIL, err,
         // TAG, "error while writing samples to wav file");
 
+        // 在读取数据后添加调试输出
+        int16_t max_value = 0;
+        for(int i = 0; i < bytes_read/2; i++) {
+            if(abs(i2s_readraw_buff[i]) > max_value) {
+                max_value = abs(i2s_readraw_buff[i]);
+            }
+        }
+        ESP_LOGD(TAG, "Max sample value: %d", max_value);
 
+        // 添加平均值计算，帮助判断是否有有效信号
+        int32_t sum = 0;
+        for(int i = 0; i < bytes_read/2; i++) {
+            sum += abs(i2s_readraw_buff[i]);
+        }
+        int16_t avg_value = sum / (bytes_read/2);
+        ESP_LOGD(TAG, "Max: %d, Avg: %d", max_value, avg_value);
         if (m_file->write_file( (char *)i2s_readraw_buff,bytes_read)!=ESP_OK) {
             ESP_LOGE(TAG, "写入音频数据失败");
             goto err;
